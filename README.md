@@ -15,7 +15,7 @@ A car of known model has a known distance between its front and rear hub centres
 
 ## Use
 
-1. Open `street-width-lab.html` in Chrome or Firefox (if the browser blocks requests from `file://`, run `python -m http.server` here and open `http://localhost:8000/street-width-lab.html`).
+1. Open the tool at https://kauevestena.github.io/street-width-lab/ or locally (`street-width-lab.html` in Chrome or Firefox; if the browser blocks requests from `file://`, run `python -m http.server` here and open `http://localhost:8000/street-width-lab.html`).
 2. Paste a Mapillary client token (Mapillary dashboard → Developers). It stays in your browser.
 3. Draw the segment, search, pick one sequence (360° if available).
 4. Add cars with their wheelbase, click front and rear hub centres in every frame where they are visible within about 12 m. Click edge points (curb joints, wall corners) in two or more frames.
