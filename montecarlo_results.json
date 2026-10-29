@@ -1,0 +1,110 @@
+{
+ "S1 forward cam, hubs clicked 3.5-22 m, 4 frames": {
+  "mapillary": {
+   "bias_m": 0.2409,
+   "rmse_m": 0.2419,
+   "pred_sigma_m": 0.0543,
+   "scale_rmse_pct": 2.913,
+   "scale_pred_pct": 0.0,
+   "sigma0": 0.77
+  },
+  "wheelbase": {
+   "bias_m": -0.0317,
+   "rmse_m": 0.0814,
+   "pred_sigma_m": 0.0956,
+   "scale_rmse_pct": 0.978,
+   "scale_pred_pct": 1.297,
+   "sigma0": 0.77
+  }
+ },
+ "S2 forward cam, hubs clicked 3.5-10 m, 4 frames": {
+  "mapillary": {
+   "bias_m": 0.2428,
+   "rmse_m": 0.2437,
+   "pred_sigma_m": 0.0542,
+   "scale_rmse_pct": 2.913,
+   "scale_pred_pct": 0.0,
+   "sigma0": 0.73
+  },
+  "wheelbase": {
+   "bias_m": -0.0323,
+   "rmse_m": 0.107,
+   "pred_sigma_m": 0.0991,
+   "scale_rmse_pct": 1.264,
+   "scale_pred_pct": 1.344,
+   "sigma0": 0.74
+  }
+ },
+ "S3 forward cam, hubs clicked 3.5-12 m, every frame": {
+  "mapillary": {
+   "bias_m": 0.2338,
+   "rmse_m": 0.2341,
+   "pred_sigma_m": 0.0412,
+   "scale_rmse_pct": 2.913,
+   "scale_pred_pct": 0.0,
+   "sigma0": 0.84
+  },
+  "wheelbase": {
+   "bias_m": -0.003,
+   "rmse_m": 0.0531,
+   "pred_sigma_m": 0.0461,
+   "scale_rmse_pct": 0.614,
+   "scale_pred_pct": 0.737,
+   "sigma0": 0.84
+  }
+ },
+ "S4 = S3 with Mapillary rotation noise 0.1\u00b0": {
+  "mapillary": {
+   "bias_m": 0.2341,
+   "rmse_m": 0.2344,
+   "pred_sigma_m": 0.0412,
+   "scale_rmse_pct": 2.913,
+   "scale_pred_pct": 0.0,
+   "sigma0": 0.84
+  },
+  "wheelbase": {
+   "bias_m": -0.0029,
+   "rmse_m": 0.0531,
+   "pred_sigma_m": 0.0461,
+   "scale_rmse_pct": 0.616,
+   "scale_pred_pct": 0.737,
+   "sigma0": 0.84
+  }
+ },
+ "S5 360\u00b0 pano, 2048 px thumbnails, every frame": {
+  "mapillary": {
+   "bias_m": 0.2438,
+   "rmse_m": 0.244,
+   "pred_sigma_m": 0.0277,
+   "scale_rmse_pct": 2.913,
+   "scale_pred_pct": 0.0,
+   "sigma0": 0.88
+  },
+  "wheelbase": {
+   "bias_m": -0.0003,
+   "rmse_m": 0.014,
+   "pred_sigma_m": 0.0222,
+   "scale_rmse_pct": 0.215,
+   "scale_pred_pct": 0.398,
+   "sigma0": 0.88
+  }
+ },
+ "S6 360\u00b0 pano, full res 5760 px, every frame": {
+  "mapillary": {
+   "bias_m": 0.2415,
+   "rmse_m": 0.2416,
+   "pred_sigma_m": 0.0255,
+   "scale_rmse_pct": 2.913,
+   "scale_pred_pct": 0.0,
+   "sigma0": 0.87
+  },
+  "wheelbase": {
+   "bias_m": -0.0001,
+   "rmse_m": 0.0051,
+   "pred_sigma_m": 0.0136,
+   "scale_rmse_pct": 0.09,
+   "scale_pred_pct": 0.345,
+   "sigma0": 0.87
+  }
+ }
+}

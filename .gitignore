@@ -218,3 +218,12 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# street-width-lab
+test/imgs/
+test/sim_e2e.json
+test/exported.json
+test/*.png
+test/report_e2e.md
+sim_*.json
+node_modules/

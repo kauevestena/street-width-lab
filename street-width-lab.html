@@ -1,0 +1,1229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Street-width lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
+<style>
+/* Layout: header bar; two workspaces (1: map | control column, 2: image viewer + strip | control column). */
+:root {
+  --bg: #eef0ee;
+  --panel: #fbfcfb;
+  --ink: #1b2220;
+  --muted: #5b6662;
+  --line: #d5dad7;
+  --accent: #0d6870;
+  --accent-ink: #ffffff;
+  --wheel: #d45d0b;
+  --good: #2b7a31;
+  --warn: #a86400;
+  --bad: #c0282b;
+  --g1: #2563d6; --g2: #8b3ff5; --g3: #12905a; --g4: #c2185b; --g5: #7a6f00; --g6: #00808c;
+  --viewer-bg: #1f2528;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #131819; --panel: #1b2224; --ink: #e3e9e6; --muted: #98a4a0; --line: #2d373a;
+    --accent: #3cb0ba; --accent-ink: #08191b; --wheel: #ff8a3d; --good: #69bb6d; --warn: #f0ae4a; --bad: #ef5a5a;
+    --g1: #74a3ff; --g2: #b58cff; --g3: #4cc38a; --g4: #f06a9a; --g5: #cfc64e; --g6: #4fd0dc;
+    --viewer-bg: #0d1112; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #131819; --panel: #1b2224; --ink: #e3e9e6; --muted: #98a4a0; --line: #2d373a;
+  --accent: #3cb0ba; --accent-ink: #08191b; --wheel: #ff8a3d; --good: #69bb6d; --warn: #f0ae4a; --bad: #ef5a5a;
+  --g1: #74a3ff; --g2: #b58cff; --g3: #4cc38a; --g4: #f06a9a; --g5: #cfc64e; --g6: #4fd0dc;
+  --viewer-bg: #0d1112; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 14px/1.45 var(--font-body); display: flex; flex-direction: column; }
+.bar { display: flex; align-items: center; gap: 14px; padding: 8px 14px; background: var(--panel); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.brand { font-weight: 600; white-space: nowrap; }
+.brand small { font-weight: 400; color: var(--muted); margin-left: 8px; font-size: 12.5px; }
+.tabs { display: flex; gap: 4px; }
+.tab { border-radius: 999px; padding: 4px 12px; }
+.tab.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.bar-right { margin-left: auto; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+#token { width: 250px; font-family: var(--font-mono); font-size: 12.5px; }
+input, select, button, textarea { font: inherit; color: inherit; }
+input, select, textarea { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; min-width: 0; }
+textarea { width: 100%; font-family: var(--font-mono); font-size: 12px; }
+button { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button:disabled { opacity: .5; cursor: default; }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+main { flex: 1; min-height: 0; min-width: 0; display: flex; }
+.ws { display: none; flex: 1; min-height: 0; min-width: 0; }
+.ws.on { display: flex; }
+#map { flex: 1; min-width: 0; }
+.side { width: 390px; flex: none; border-left: 1px solid var(--line); background: var(--panel); overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 16px; }
+.step { display: grid; gap: 8px; }
+.step h3, details > summary { margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); font-weight: 600; }
+.step h3 { display: flex; gap: 8px; align-items: center; }
+.n { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); font-size: 11px; letter-spacing: 0; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.note { color: var(--muted); font-size: 12.5px; margin: 0; }
+.status { font-size: 12.5px; padding: 6px 8px; border-radius: 6px; background: var(--bg); border-left: 3px solid var(--line); }
+.status.ok { border-left-color: var(--good); }
+.status.warn { border-left-color: var(--warn); }
+.status.bad { border-left-color: var(--bad); }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.seqlist { display: grid; gap: 4px; max-height: 280px; overflow-y: auto; }
+.seq { display: grid; grid-template-columns: auto 12px 1fr; gap: 8px; align-items: center; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; font-size: 12.5px; }
+.sw { width: 12px; height: 12px; border-radius: 3px; }
+details { border-top: 1px solid var(--line); padding-top: 10px; }
+details > summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between; }
+details > summary::after { content: "+"; }
+details[open] > summary::after { content: "–"; }
+details > .body { display: grid; gap: 8px; margin-top: 8px; }
+.viewer-col { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+.vtop { display: flex; gap: 8px; align-items: center; padding: 6px 10px; border-bottom: 1px solid var(--line); background: var(--panel); flex-wrap: nowrap; overflow-x: auto; white-space: nowrap; font-size: 12.5px; }
+.vtop .info { color: var(--muted); flex: 1 1 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vtop a { color: var(--accent); }
+.toggle { display: inline-flex; gap: 4px; align-items: center; }
+#viewer { flex: 1; position: relative; background: var(--viewer-bg); min-height: 0; overflow: hidden; }
+#cv { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; touch-action: none; }
+#hint { position: absolute; left: 10px; top: 10px; max-width: 70%; background: rgba(10, 14, 15, .78); color: #f2f5f4; padding: 6px 10px; border-radius: 6px; font-size: 12.5px; pointer-events: none; }
+#hint b { color: #ffd2b0; }
+#empty { position: absolute; inset: 0; display: grid; place-items: center; color: #c9d1ce; text-align: center; padding: 20px; }
+#strip { height: 92px; display: flex; gap: 6px; overflow-x: auto; padding: 6px 8px; background: var(--panel); border-top: 1px solid var(--line); }
+.th { position: relative; flex: none; width: 112px; height: 78px; border-radius: 5px; overflow: hidden; border: 2px solid transparent; background: var(--bg); cursor: pointer; padding: 0; }
+.th img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.th.cur { border-color: var(--accent); }
+.th .idx, .th .cnt { position: absolute; font: 11px/1.2 var(--font-mono); background: rgba(0, 0, 0, .6); color: #fff; padding: 1px 4px; border-radius: 3px; }
+.th .idx { left: 3px; top: 3px; }
+.th .cnt { right: 3px; bottom: 3px; }
+.th .act { position: absolute; left: 4px; bottom: 5px; width: 9px; height: 9px; border-radius: 50%; background: var(--wheel); box-shadow: 0 0 0 2px #fff; }
+.th .seqbar { position: absolute; left: 0; right: 0; top: 0; height: 3px; }
+.car { border: 1px solid var(--line); border-radius: 7px; padding: 6px; display: grid; gap: 6px; }
+.car-head { display: grid; grid-template-columns: 34px 1fr 82px 24px; gap: 6px; align-items: center; }
+.cid { font: 600 12.5px var(--font-mono); color: var(--wheel); }
+.car-hubs { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: 12px; }
+.tgt { font-size: 12px; padding: 2px 8px; border-radius: 999px; }
+.tgt b { font-family: var(--font-mono); font-weight: 500; margin-left: 4px; }
+.tgt.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.tgt.zero b { color: var(--bad); }
+.tgt.on.zero b { color: inherit; }
+.x { padding: 0 6px; line-height: 1.4; color: var(--muted); }
+.grp { display: grid; gap: 4px; }
+.grp-h { display: flex; align-items: center; gap: 6px; font: 600 12px var(--font-mono); }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chip { display: inline-flex; align-items: center; gap: 2px; }
+.chip .del { border: 0; background: none; padding: 0 2px; color: var(--muted); font-size: 13px; }
+.mini { font-size: 12px; color: var(--muted); }
+table { border-collapse: collapse; width: 100%; font-size: 12px; font-variant-numeric: tabular-nums; }
+td, th { padding: 3px 5px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+td:first-child, th:first-child { text-align: left; }
+th { color: var(--muted); font-weight: 500; }
+.pill { display: inline-block; padding: 0 6px; border-radius: 999px; font-size: 11.5px; border: 1px solid currentColor; }
+.pill.ok { color: var(--good); } .pill.warn { color: var(--warn); } .pill.bad { color: var(--bad); }
+#plan { width: 100%; height: 230px; display: block; border-radius: 6px; background: var(--bg); cursor: pointer; }
+.pair { display: grid; grid-template-columns: 1fr 86px; gap: 6px; align-items: center; font-size: 12.5px; }
+.pair code { font-size: 11.5px; color: var(--muted); }
+.modal { position: fixed; inset: 0; background: rgba(0, 0, 0, .45); display: grid; place-items: center; z-index: 50; padding: 16px; }
+.modal[hidden] { display: none; }
+.modal .card { background: var(--panel); color: var(--ink); max-width: 760px; max-height: 88vh; overflow-y: auto; padding: 20px 24px; border-radius: 10px; border: 1px solid var(--line); }
+.modal h2 { margin: 0 0 8px; font-size: 18px; text-wrap: balance; }
+.modal h4 { margin: 14px 0 4px; font-size: 14px; }
+.modal p, .modal li { max-width: 68ch; }
+kbd { font: 11.5px var(--font-mono); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; background: var(--bg); }
+#toast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); background: var(--ink); color: var(--panel); padding: 8px 14px; border-radius: 8px; font-size: 13px; opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 60; max-width: 90vw; }
+#toast.show { opacity: 1; }
+.maplibregl-popup-content { background: var(--panel); color: var(--ink); font: 12px var(--font-body); }
+.mk { font: 600 11px var(--font-mono); background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }
+.mk.lr { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+@media (prefers-reduced-motion: reduce) { #toast { transition: none; } }
+@media (max-width: 820px) {
+  .ws.on { flex-direction: column; }
+  .side { width: auto; border-left: 0; border-top: 1px solid var(--line); max-height: 48%; }
+  #token { width: 170px; }
+}
+</style>
+</head>
+<body>
+<header class="bar">
+  <div class="brand">Street-width lab <small>Mapillary · wheelbase scale bars</small></div>
+  <nav class="tabs" aria-label="Workspaces">
+    <button id="tab-select" class="tab on" type="button">1 · Segment and images</button>
+    <button id="tab-measure" class="tab" type="button">2 · Click observations</button>
+  </nav>
+  <div class="bar-right">
+    <label for="token" class="sr">Mapillary client token</label>
+    <input id="token" type="password" placeholder="Mapillary client token (MLY|…)" autocomplete="off">
+    <button id="btn-import" type="button">Import JSON</button>
+    <input id="file-import" type="file" accept=".json,application/json" hidden>
+    <button id="btn-export" class="primary" type="button">Export JSON</button>
+    <button id="btn-copy" type="button" title="Copy the project JSON to the clipboard">Copy</button>
+    <button id="btn-help" type="button">Help</button>
+  </div>
+</header>
+
+<main>
+  <section id="ws-select" class="ws on" aria-label="Segment and images">
+    <div id="map"></div>
+    <aside class="side">
+      <div class="step">
+        <h3><span class="n">1</span>Street segment</h3>
+        <p class="note">Draw the street axis from start to end. Left and right in this project mean left and right when walking from start to end.</p>
+        <div class="row">
+          <button id="btn-draw" type="button">Draw segment</button>
+          <label for="buffer" class="mini">Buffer</label>
+          <input id="buffer" type="range" min="5" max="50" step="1" value="15" style="width:120px">
+          <span id="buffer-v" class="mono mini">15 m</span>
+        </div>
+        <div class="row">
+          <label for="goto" class="sr">Go to latitude, longitude</label>
+          <input id="goto" placeholder="lat, lon  (e.g. -25.4396, -49.2689)" style="flex:1">
+          <button id="btn-goto" type="button">Go</button>
+        </div>
+        <div id="seg-status" class="status">No segment yet.</div>
+      </div>
+      <div class="step">
+        <h3><span class="n">2</span>Mapillary images</h3>
+        <button id="btn-search" type="button">Search images along the segment</button>
+        <div id="search-status" class="status">Paste your Mapillary client token at the top, then search. Green lines on the map show Mapillary coverage once the token is set.</div>
+      </div>
+      <div class="step">
+        <h3><span class="n">3</span>Sequences to use</h3>
+        <p class="note">Start with a single sequence: images from one capture share one reconstruction, so their poses are consistent. 360° sequences give the best view of parked cars.</p>
+        <div class="row"><button id="seq-all" type="button">All</button><button id="seq-none" type="button">None</button></div>
+        <div id="seqlist" class="seqlist"><p class="note">No search yet.</p></div>
+        <button id="btn-use" class="primary" type="button" disabled>Use selected images</button>
+      </div>
+    </aside>
+  </section>
+
+  <section id="ws-measure" class="ws" aria-label="Click observations">
+    <div class="viewer-col">
+      <div class="vtop">
+        <button id="v-prev" type="button" title="Previous image (←)">◀</button>
+        <span id="v-idx" class="mono">–</span>
+        <button id="v-next" type="button" title="Next image (→)">▶</button>
+        <button id="v-fit" type="button" title="Fit image (F)">Fit</button>
+        <label class="toggle"><input id="v-full" type="checkbox"> Full resolution</label>
+        <label class="toggle"><input id="v-proj" type="checkbox" checked> Projections</label>
+        <label class="toggle"><input id="v-follow" type="checkbox" checked> Follow active point</label>
+        <span id="v-info" class="info mono"></span>
+        <a id="v-link" href="#" target="_blank" rel="noopener">Open in Mapillary</a>
+      </div>
+      <div id="viewer">
+        <canvas id="cv"></canvas>
+        <div id="hint">Select a target on the right, then click it in the image.</div>
+        <div id="empty">No images yet. Pick a segment and its images in step 1.</div>
+      </div>
+      <div id="strip" aria-label="Images in the segment"></div>
+    </div>
+    <aside class="side">
+      <div id="active-line" class="status">No active target.</div>
+
+      <details open>
+        <summary>Cars · wheel hubs</summary>
+        <div class="body">
+          <p class="note">Click the hub centre of the two wheels on the side you see. Use the wheelbase from your lookup table.</p>
+          <div id="cars"></div>
+          <button id="add-car" type="button">+ Add car</button>
+        </div>
+      </details>
+
+      <details open>
+        <summary>Edge points</summary>
+        <div class="body">
+          <p class="note">Each point must be a feature you can recognise in several frames: a curb joint, the corner of a drain inlet, the base of a wall corner. Arbitrary points along a line cannot be matched between frames.</p>
+          <div class="row">
+            <label for="grp-sel" class="sr">Group</label>
+            <select id="grp-sel"></select>
+            <button id="add-pt" type="button">+ Point</button>
+            <input id="grp-new" placeholder="new group" style="width:110px">
+            <button id="add-grp" type="button">+ Group</button>
+          </div>
+          <div id="points"></div>
+        </div>
+      </details>
+
+      <details open>
+        <summary>Plan view</summary>
+        <div class="body">
+          <canvas id="plan" aria-label="Plan view along the street axis"></canvas>
+          <p class="note">Street axis left to right, start at the left. Click a camera to open its image.</p>
+        </div>
+      </details>
+
+      <details open>
+        <summary>Quick look (Mapillary poses, no adjustment)</summary>
+        <div class="body" id="quick"><p class="note">Triangulated values appear once points are clicked in two or more images.</p></div>
+      </details>
+
+      <details>
+        <summary>Widths and tape measurements</summary>
+        <div class="body">
+          <div id="pairs"></div>
+          <div class="row">
+            <input id="pair-name" placeholder="name" style="width:110px">
+            <select id="pair-a" aria-label="First group"></select>
+            <select id="pair-b" aria-label="Second group"></select>
+            <button id="add-pair" type="button">+ Width</button>
+          </div>
+        </div>
+      </details>
+
+      <details>
+        <summary>Settings and lookup table</summary>
+        <div class="body">
+          <div class="row"><label for="sig">Click precision σ (display px)</label><input id="sig" type="number" step="0.1" min="0.3" value="1.5" style="width:70px"></div>
+          <label for="lookup" class="mini">Wheelbase lookup, one per line: <span class="mono">model; wheelbase_m</span></label>
+          <textarea id="lookup" rows="6" placeholder="VW Gol G5; 2.465"></textarea>
+          <datalist id="lookup-list"></datalist>
+          <button id="btn-new" type="button">Start a new project</button>
+        </div>
+      </details>
+    </aside>
+  </section>
+</main>
+
+<div id="help" class="modal" hidden>
+  <div class="card" role="dialog" aria-labelledby="help-title">
+    <h2 id="help-title">How the experiment works</h2>
+    <p>You click wheel hubs and street-edge points in several Mapillary frames. Each car's front and rear hub on the same side are a scale bar of known length (the wheelbase). The exported JSON goes to a bundle adjustment that solves image orientations, the points and one scale factor for Mapillary's trajectory, then reports the widths with their standard deviations.</p>
+    <h4>Workflow</h4>
+    <ol>
+      <li>Paste your Mapillary client token (create one at mapillary.com → Dashboard → Developers). It stays in this browser.</li>
+      <li>Draw the segment along the street axis, set the buffer and search. Keep one sequence to start.</li>
+      <li>Add a car, type the wheelbase, select <b>Front hub</b> and click it in every frame where you see it well. Then the rear hub.</li>
+      <li>Add edge points in groups: <span class="mono">curb_L, curb_R, facade_L, facade_R</span>. Click each in two or more frames.</li>
+      <li>Type your tape measurements under <i>Widths and tape measurements</i>, then export the JSON.</li>
+    </ol>
+    <h4>What helps the adjustment</h4>
+    <ul>
+      <li>Click every hub in every frame where it is visible within about 12 m. In simulation this halved the width error compared with clicking 4 frames.</li>
+      <li>360° sequences see parked cars from the side and give several times better scale. Turn on <b>Full resolution</b> when clicking panoramas.</li>
+      <li>After a point has two clicks, a dashed ring shows where it should be in the other frames. With one click you get the epipolar curve. A click far from the ring means a wrong match.</li>
+      <li>Hub centre means the centre of the wheel cap, not the centre of the tyre ellipse.</li>
+    </ul>
+    <h4>Keys</h4>
+    <p><kbd>←</kbd>/<kbd>→</kbd> or <kbd>A</kbd>/<kbd>D</kbd> previous/next image · <kbd>[</kbd>/<kbd>]</kbd> previous/next target · <kbd>F</kbd> fit · <kbd>P</kbd> projections · <kbd>Del</kbd> remove the active target's click in this image · right-click a mark to delete it · wheel to zoom · drag to pan · <kbd>Esc</kbd> clear target</p>
+    <h4>Conventions</h4>
+    <p class="note">Poses are Mapillary's <span class="mono">computed_rotation</span> (angle-axis, ENU to camera, x right, y down, z forward) and <span class="mono">computed_geometry</span>/<span class="mono">computed_altitude</span>. The pose check in the quick look compares the camera axis with <span class="mono">computed_compass_angle</span>; it should be within a degree or two.</p>
+    <div class="row" style="justify-content:flex-end;margin-top:10px"><button id="help-close" class="primary" type="button">Close</button></div>
+  </div>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script>
+(() => {
+'use strict';
+const $ = (id) => document.getElementById(id);
+const LS = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } },
+  del(k) { try { localStorage.removeItem(k); } catch (e) { /* ignore */ } },
+};
+const GRAPH = 'https://graph.mapillary.com';
+const STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
+const FIELDS = ['id', 'captured_at', 'compass_angle', 'computed_compass_angle', 'geometry', 'computed_geometry', 'altitude',
+  'computed_altitude', 'computed_rotation', 'camera_type', 'camera_parameters', 'width', 'height', 'sequence', 'is_pano',
+  'exif_orientation', 'make', 'model', 'thumb_256_url'].join(',');
+const MIN_FIELDS = 'id,computed_geometry,geometry,sequence,captured_at';
+const SEQ_COLORS = ['#e4572e', '#2563d6', '#12905a', '#8b3ff5', '#c2185b', '#00808c', '#a86400', '#5b6662'];
+const DEFAULT_PAIRS = [
+  { name: 'road (curb to curb)', a: 'curb_L', b: 'curb_R' },
+  { name: 'sidewalk left', a: 'curb_L', b: 'facade_L' },
+  { name: 'sidewalk right', a: 'curb_R', b: 'facade_R' },
+];
+
+// ------------------------------------------------------------------ state
+const S = {
+  token: LS.get('swl-token', ''),
+  segment: null, buffer: 15,
+  found: [], seqs: [], seqSel: {},
+  images: [], ref: null,
+  cars: [], points: [], observations: [],
+  groups: ['curb_L', 'curb_R', 'facade_L', 'facade_R'],
+  pairs: DEFAULT_PAIRS.map((p) => ({ ...p })),
+  gt: {},
+  settings: { sigma_click_px: 1.5, display_long_side: 2048 },
+  lookup: [],
+  cur: 0, active: null, fullres: false, showProj: true, follow: true,
+};
+const cams = new Map();
+const urlCache = new Map();
+const imgCache = new Map();
+let QL = null;
+
+// ------------------------------------------------------------------ small helpers
+function toast(msg, ms = 3200) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), ms);
+}
+function esc(s) { return String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+function cssVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+function fmt(x, d = 3) { return (x == null || !isFinite(x)) ? '–' : x.toFixed(d); }
+function median(a) { const b = [...a].sort((x, y) => x - y); const n = b.length; return n ? (n % 2 ? b[(n - 1) / 2] : 0.5 * (b[n / 2 - 1] + b[n / 2])) : NaN; }
+async function getJSON(url) {
+  const r = await fetch(url);
+  let j = null; try { j = await r.json(); } catch (e) { /* not JSON */ }
+  if (!r.ok) throw new Error((j && j.error && j.error.message) || `HTTP ${r.status}`);
+  return j;
+}
+async function pool(items, n, fn) {
+  const out = new Array(items.length); let k = 0;
+  await Promise.all(Array.from({ length: Math.min(n, items.length) }, async () => {
+    while (k < items.length) { const i = k++; try { out[i] = await fn(items[i], i); } catch (e) { out[i] = null; } }
+  }));
+  return out;
+}
+
+// ------------------------------------------------------------------ geodesy
+const WA = 6378137, WF = 1 / 298.257223563, WE2 = WF * (2 - WF), D2R = Math.PI / 180;
+function ecef(lon, lat, h) {
+  const lo = lon * D2R, la = lat * D2R, n = WA / Math.sqrt(1 - WE2 * Math.sin(la) ** 2);
+  return [(n + h) * Math.cos(la) * Math.cos(lo), (n + h) * Math.cos(la) * Math.sin(lo), (n * (1 - WE2) + h) * Math.sin(la)];
+}
+function enuMat(lon0, lat0) {
+  const lo = lon0 * D2R, la = lat0 * D2R;
+  return [[-Math.sin(lo), Math.cos(lo), 0],
+    [-Math.sin(la) * Math.cos(lo), -Math.sin(la) * Math.sin(lo), Math.cos(la)],
+    [Math.cos(la) * Math.cos(lo), Math.cos(la) * Math.sin(lo), Math.sin(la)]];
+}
+function toENU(lon, lat, h, ref) {
+  const x = ecef(lon, lat, h), x0 = ecef(ref.lon, ref.lat, ref.alt), M = enuMat(ref.lon, ref.lat);
+  const d = [x[0] - x0[0], x[1] - x0[1], x[2] - x0[2]];
+  return [0, 1, 2].map((i) => M[i][0] * d[0] + M[i][1] * d[1] + M[i][2] * d[2]);
+}
+function fromENU(e, ref) {
+  const M = enuMat(ref.lon, ref.lat), x0 = ecef(ref.lon, ref.lat, ref.alt);
+  const x = [0, 1, 2].map((j) => x0[j] + M[0][j] * e[0] + M[1][j] * e[1] + M[2][j] * e[2]);
+  const lon = Math.atan2(x[1], x[0]), p = Math.hypot(x[0], x[1]);
+  let lat = Math.atan2(x[2], p * (1 - WE2)), h = 0;
+  for (let i = 0; i < 6; i++) {
+    const n = WA / Math.sqrt(1 - WE2 * Math.sin(lat) ** 2);
+    h = p / Math.cos(lat) - n; lat = Math.atan2(x[2], p * (1 - WE2 * n / (n + h)));
+  }
+  return [lon / D2R, lat / D2R, h];
+}
+// flat local metres, for map drawing only
+function m2(lon, lat, lon0, lat0) { return [(lon - lon0) * D2R * WA * Math.cos(lat0 * D2R), (lat - lat0) * D2R * WA]; }
+function im2(x, y, lon0, lat0) { return [lon0 + x / (D2R * WA * Math.cos(lat0 * D2R)), lat0 + y / (D2R * WA)]; }
+
+// ------------------------------------------------------------------ linear algebra
+function rotvec(v) {
+  const th = Math.hypot(v[0], v[1], v[2]);
+  if (th < 1e-12) return [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
+  const [x, y, z] = v.map((a) => a / th), c = Math.cos(th), s = Math.sin(th), C = 1 - c;
+  return [[c + x * x * C, x * y * C - z * s, x * z * C + y * s],
+    [y * x * C + z * s, c + y * y * C, y * z * C - x * s],
+    [z * x * C - y * s, z * y * C + x * s, c + z * z * C]];
+}
+const mul = (M, v) => [0, 1, 2].map((i) => M[i][0] * v[0] + M[i][1] * v[1] + M[i][2] * v[2]);
+const mulT = (M, v) => [0, 1, 2].map((i) => M[0][i] * v[0] + M[1][i] * v[1] + M[2][i] * v[2]);
+const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const nrm = (a) => Math.hypot(a[0], a[1], a[2]);
+function solve3(A, b) {
+  const det = (M) => M[0][0] * (M[1][1] * M[2][2] - M[1][2] * M[2][1]) - M[0][1] * (M[1][0] * M[2][2] - M[1][2] * M[2][0]) + M[0][2] * (M[1][0] * M[2][1] - M[1][1] * M[2][0]);
+  const D = det(A); if (Math.abs(D) < 1e-12) return null;
+  return [0, 1, 2].map((k) => det(A.map((row, i) => row.map((v, j) => (j === k ? b[i] : v)))) / D);
+}
+
+// ------------------------------------------------------------------ cameras (OpenSfM / MapillaryJS conventions)
+function camOf(im) {
+  const t = (im.camera_type || 'perspective').toLowerCase();
+  const code = t === 'fisheye' ? 1 : (t === 'spherical' || t === 'equirectangular') ? 2 : 0;
+  const p = (im.camera_parameters || []).concat([0, 0, 0]);
+  const f = code === 2 ? 1 : (+p[0] || 0.85), k1 = code === 2 ? 0 : (+p[1] || 0), k2 = code === 2 ? 0 : (+p[2] || 0);
+  const g = (im.computed_geometry || im.geometry).coordinates;
+  const alt = im.computed_altitude ?? im.altitude ?? S.ref.alt;
+  const w = +im.width || 2048, h = +im.height || 1536;
+  return { id: im.id, code, f, k1, k2, w, h, s: Math.max(w, h), R: rotvec(im.computed_rotation || [0, 0, 0]), C: toENU(g[0], g[1], alt, S.ref), posed: !!im.computed_rotation };
+}
+function projN(c, x) {
+  const [X, Y, Z] = x;
+  if (c.code === 0) {
+    if (Z < 0.1) return null;
+    const a = X / Z, b = Y / Z, r2 = a * a + b * b; if (r2 > 4) return null;
+    const d = 1 + c.k1 * r2 + c.k2 * r2 * r2; return [c.f * d * a, c.f * d * b];
+  }
+  if (c.code === 1) {
+    const l = Math.hypot(X, Y), th = Math.atan2(l, Z); if (th > 1.9) return null;
+    const d = 1 + c.k1 * th * th + c.k2 * th ** 4, L = Math.max(l, 1e-12);
+    return [c.f * th * d * X / L, c.f * th * d * Y / L];
+  }
+  const lon = Math.atan2(X, Z), lat = Math.atan2(-Y, Math.hypot(X, Z));
+  return [lon / (2 * Math.PI), -lat / (2 * Math.PI)];
+}
+function bearN(c, u, v) {
+  if (c.code === 2) { const lon = 2 * Math.PI * u, lat = -2 * Math.PI * v; return [Math.cos(lat) * Math.sin(lon), -Math.sin(lat), Math.cos(lat) * Math.cos(lon)]; }
+  const rho = Math.hypot(u, v) / c.f; if (rho < 1e-12) return [0, 0, 1];
+  let t = rho;
+  for (let i = 0; i < 30; i++) { const g = t * (1 + c.k1 * t * t + c.k2 * t ** 4) - rho, dg = 1 + 3 * c.k1 * t * t + 5 * c.k2 * t ** 4; t -= g / dg; }
+  const du = u / (rho * c.f), dv = v / (rho * c.f);
+  const b = c.code === 0 ? [du * t, dv * t, 1] : [du * Math.sin(t), dv * Math.sin(t), Math.cos(t)];
+  const n = nrm(b); return b.map((a) => a / n);
+}
+const frac2n = (c, xf, yf) => [(xf * c.w - c.w / 2) / c.s, (yf * c.h - c.h / 2) / c.s];
+const n2frac = (c, u, v) => [(u * c.s + c.w / 2) / c.w, (v * c.s + c.h / 2) / c.h];
+function projWorld(c, X) { const uv = projN(c, mul(c.R, sub(X, c.C))); return uv ? n2frac(c, uv[0], uv[1]) : null; }
+function rayOf(c, xf, yf) { const [u, v] = frac2n(c, xf, yf); return { C: c.C, d: mulT(c.R, bearN(c, u, v)) }; }
+function triangulate(rays) {
+  const A = [[0, 0, 0], [0, 0, 0], [0, 0, 0]], b = [0, 0, 0];
+  for (const { C, d } of rays) for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) { const P = (i === j ? 1 : 0) - d[i] * d[j]; A[i][j] += P; b[i] += P * C[j]; }
+  return solve3(A, b);
+}
+function heading(c) { const ax = [c.R[2][0], c.R[2][1], c.R[2][2]]; return ((Math.atan2(ax[0], ax[1]) / D2R) + 360) % 360; }
+
+function computeRef(images) {
+  const g = images.map((im) => (im.computed_geometry || im.geometry).coordinates);
+  const al = images.map((im) => im.computed_altitude ?? im.altitude ?? 0);
+  const mean = (a) => a.reduce((x, y) => x + y, 0) / a.length;
+  return { lon: mean(g.map((x) => x[0])), lat: mean(g.map((x) => x[1])), alt: mean(al) };
+}
+function rebuildCams() { cams.clear(); if (!S.ref) return; for (const im of S.images) cams.set(im.id, camOf(im)); }
+function segAxis() {
+  if (!S.segment || !S.segment.end || !S.ref) return null;
+  const a = toENU(S.segment.start[0], S.segment.start[1], S.ref.alt, S.ref), b = toENU(S.segment.end[0], S.segment.end[1], S.ref.alt, S.ref);
+  const v = [b[0] - a[0], b[1] - a[1]], L = Math.hypot(v[0], v[1]);
+  return L > 0 ? { o: a, d: [v[0] / L, v[1] / L], L } : null;
+}
+
+// ------------------------------------------------------------------ project (de)serialisation
+function projectObj() {
+  const ids = new Set(S.images.map((i) => i.id));
+  const strip = (im) => { const o = { ...im }; for (const k of Object.keys(o)) if (k.startsWith('thumb_')) delete o[k]; return o; };
+  return {
+    format: 'mly-scalebar-project/1', tool: 'street-width-lab 1.0', created: new Date().toISOString(),
+    segment: S.segment ? { start: S.segment.start, end: S.segment.end, buffer_m: S.buffer } : null,
+    reference: S.ref, settings: S.settings,
+    images: S.images.map(strip), cars: S.cars, points: S.points,
+    observations: S.observations.filter((o) => ids.has(o.image)),
+    groups: S.groups, width_pairs: S.pairs,
+    ground_truth: Object.entries(S.gt).filter(([, v]) => v != null && v !== '' && isFinite(v)).map(([pair, w]) => ({ pair, width_m: +w })),
+  };
+}
+function loadProjectObj(d) {
+  S.segment = d.segment && d.segment.start ? { start: d.segment.start, end: d.segment.end } : null;
+  S.buffer = (d.segment && d.segment.buffer_m) || 15;
+  S.images = d.images || []; S.ref = d.reference || (S.images.length ? computeRef(S.images) : null);
+  S.cars = d.cars || []; S.points = d.points || []; S.observations = d.observations || [];
+  S.groups = d.groups || ['curb_L', 'curb_R', 'facade_L', 'facade_R'];
+  S.pairs = d.width_pairs || DEFAULT_PAIRS.map((p) => ({ ...p }));
+  S.gt = Object.fromEntries((d.ground_truth || []).map((g) => [g.pair, g.width_m]));
+  S.settings = Object.assign({ sigma_click_px: 1.5, display_long_side: 2048 }, d.settings || {});
+  S.cur = 0; S.active = null; S.found = []; S.seqs = [];
+  rebuildCams();
+}
+let saveT = null;
+function autosave() { clearTimeout(saveT); saveT = setTimeout(() => LS.set('swl-project', projectObj()), 400); }
+
+// ------------------------------------------------------------------ map (step 1)
+let map = null, drawMode = 0, markers = [];
+function initMap() {
+  if (!window.maplibregl) { $('map').innerHTML = '<p class="note" style="padding:20px">The map library did not load. Check the internet connection and reload.</p>'; return; }
+  const view = LS.get('swl-view', { center: [-51.9, -14.2], zoom: 3.6 });
+  map = new maplibregl.Map({ container: 'map', style: STYLE_URL, center: view.center, zoom: view.zoom, attributionControl: { compact: true } });
+  map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-left');
+  map.on('moveend', () => LS.set('swl-view', { center: map.getCenter().toArray(), zoom: map.getZoom() }));
+  map.on('error', (e) => { if (e && e.error && /style/i.test(String(e.error.message))) toast('Basemap style failed to load.'); });
+  map.on('load', () => {
+    map.addSource('seg', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+    map.addSource('imgs', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+    map.addLayer({ id: 'seg-buf', type: 'fill', source: 'seg', filter: ['==', ['get', 'k'], 'buf'], paint: { 'fill-color': '#0d6870', 'fill-opacity': 0.12 } });
+    map.addLayer({ id: 'seg-line', type: 'line', source: 'seg', filter: ['==', ['get', 'k'], 'line'], paint: { 'line-color': '#0d6870', 'line-width': 3, 'line-dasharray': [2, 1] } });
+    map.addLayer({ id: 'imgs-c', type: 'circle', source: 'imgs', paint: {
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 14, 2.5, 19, 6],
+      'circle-color': ['get', 'color'], 'circle-opacity': ['case', ['get', 'sel'], 0.95, 0.25],
+      'circle-stroke-width': ['case', ['get', 'sel'], 1, 0], 'circle-stroke-color': '#ffffff' } });
+    addCoverage(); refreshMap();
+  });
+  map.on('click', onMapClick);
+  map.on('mousemove', (e) => {
+    if (drawMode === 2 && S.segment) setSegData([S.segment.start, e.lngLat.toArray()], null);
+  });
+  map.on('click', 'imgs-c', (e) => {
+    if (drawMode) return;
+    const p = e.features[0].properties;
+    const im = S.found.find((x) => x.id === p.id) || S.images.find((x) => x.id === p.id);
+    if (!im) return;
+    new maplibregl.Popup({ maxWidth: '260px' }).setLngLat(e.lngLat).setHTML(
+      `${im.thumb_256_url ? `<img src="${esc(im.thumb_256_url)}" alt="" style="width:100%;border-radius:4px">` : ''}
+       <div class="mono">${esc(im.id)}</div><div>${new Date(im.captured_at).toISOString().slice(0, 10)} · ${esc(im.camera_type || '')}</div>
+       <a href="https://www.mapillary.com/app/?pKey=${esc(im.id)}" target="_blank" rel="noopener">Open in Mapillary</a>`).addTo(map);
+  });
+}
+function addCoverage() {
+  if (!map || !map.isStyleLoaded()) return;
+  if (map.getLayer('cov-seq')) map.removeLayer('cov-seq');
+  if (map.getLayer('cov-img')) map.removeLayer('cov-img');
+  if (map.getSource('cov')) map.removeSource('cov');
+  if (!S.token) return;
+  map.addSource('cov', { type: 'vector', tiles: [`https://tiles.mapillary.com/maps/vtp/mly1_public/2/{z}/{x}/{y}?access_token=${encodeURIComponent(S.token)}`], minzoom: 6, maxzoom: 14 });
+  map.addLayer({ id: 'cov-seq', type: 'line', source: 'cov', 'source-layer': 'sequence', paint: { 'line-color': '#05cb63', 'line-width': 2, 'line-opacity': 0.55 } }, 'seg-buf');
+  map.addLayer({ id: 'cov-img', type: 'circle', source: 'cov', 'source-layer': 'image', minzoom: 16, paint: { 'circle-radius': 2, 'circle-color': '#05cb63', 'circle-opacity': 0.6 } }, 'seg-buf');
+}
+function capsule(seg, buf) {
+  const [lon0, lat0] = seg.start, p = m2(seg.end[0], seg.end[1], lon0, lat0), ang = Math.atan2(p[1], p[0]), pts = [];
+  for (let t = -90; t <= 90; t += 10) { const a = ang + t * D2R; pts.push([p[0] + buf * Math.cos(a), p[1] + buf * Math.sin(a)]); }
+  for (let t = 90; t <= 270; t += 10) { const a = ang + t * D2R; pts.push([buf * Math.cos(a), buf * Math.sin(a)]); }
+  pts.push(pts[0]);
+  return pts.map((q) => im2(q[0], q[1], lon0, lat0));
+}
+function distToSeg(lon, lat) {
+  const [lon0, lat0] = S.segment.start, p = m2(lon, lat, lon0, lat0), b = m2(S.segment.end[0], S.segment.end[1], lon0, lat0);
+  const L2 = b[0] ** 2 + b[1] ** 2, t = Math.max(0, Math.min(1, (p[0] * b[0] + p[1] * b[1]) / L2));
+  return Math.hypot(p[0] - t * b[0], p[1] - t * b[1]);
+}
+function setSegData(line, buf) {
+  if (!map || !map.getSource('seg')) return;
+  const f = [];
+  if (line) f.push({ type: 'Feature', properties: { k: 'line' }, geometry: { type: 'LineString', coordinates: line } });
+  if (buf) f.push({ type: 'Feature', properties: { k: 'buf' }, geometry: { type: 'Polygon', coordinates: [buf] } });
+  map.getSource('seg').setData({ type: 'FeatureCollection', features: f });
+}
+function refreshMap() {
+  if (!map || !map.getSource('seg')) return;
+  markers.forEach((m) => m.remove()); markers = [];
+  if (S.segment && S.segment.end) {
+    setSegData([S.segment.start, S.segment.end], capsule(S.segment, S.buffer));
+    const [lon0, lat0] = S.segment.start, b = m2(S.segment.end[0], S.segment.end[1], lon0, lat0), L = Math.hypot(b[0], b[1]);
+    const u = [b[0] / L, b[1] / L], left = [-u[1], u[0]], mid = [b[0] / 2, b[1] / 2], off = S.buffer + 4;
+    const mk = (txt, x, y, cls) => { const el = document.createElement('div'); el.className = 'mk ' + (cls || ''); el.textContent = txt; markers.push(new maplibregl.Marker({ element: el }).setLngLat(im2(x, y, lon0, lat0)).addTo(map)); };
+    mk('start', 0, 0); mk('end', b[0], b[1]);
+    mk('L', mid[0] + left[0] * off, mid[1] + left[1] * off, 'lr'); mk('R', mid[0] - left[0] * off, mid[1] - left[1] * off, 'lr');
+    $('seg-status').className = 'status ok';
+    $('seg-status').innerHTML = `Segment <span class="mono">${L.toFixed(1)} m</span>, buffer <span class="mono">${S.buffer} m</span>.`;
+  } else if (S.segment) {
+    setSegData(null, null);
+  } else { setSegData(null, null); $('seg-status').className = 'status'; $('seg-status').textContent = 'No segment yet.'; }
+  const list = S.found.length ? S.found : S.images;
+  const used = new Set(S.images.map((i) => i.id));
+  const colorOf = (seq) => { const i = S.seqs.findIndex((s) => s.id === seq); return SEQ_COLORS[(i < 0 ? 0 : i) % SEQ_COLORS.length]; };
+  map.getSource('imgs').setData({ type: 'FeatureCollection', features: list.map((im) => ({
+    type: 'Feature', properties: { id: im.id, color: colorOf(im.sequence), sel: S.found.length ? !!S.seqSel[im.sequence] : used.has(im.id) },
+    geometry: { type: 'Point', coordinates: (im.computed_geometry || im.geometry).coordinates } })) });
+}
+function onMapClick(e) {
+  if (!drawMode) return;
+  const ll = e.lngLat.toArray();
+  if (drawMode === 1) { S.segment = { start: ll, end: null }; drawMode = 2; $('seg-status').textContent = 'Now click the end of the segment.'; }
+  else if (drawMode === 2) {
+    S.segment.end = ll; drawMode = 0; map.getCanvas().style.cursor = '';
+    $('btn-draw').textContent = 'Redraw segment';
+    S.found = []; S.seqs = []; S.seqSel = {}; renderSeqs(); refreshMap(); autosave();
+  }
+}
+function startDraw() {
+  if (!map) return;
+  drawMode = 1; map.getCanvas().style.cursor = 'crosshair';
+  $('seg-status').className = 'status warn'; $('seg-status').textContent = 'Click the start of the segment on the map.';
+}
+
+async function search() {
+  if (!S.token) { toast('Paste your Mapillary client token first.'); $('token').focus(); return; }
+  if (!S.segment || !S.segment.end) { toast('Draw the segment first.'); return; }
+  const poly = capsule(S.segment, S.buffer);
+  const bbox = [Math.min(...poly.map((p) => p[0])), Math.min(...poly.map((p) => p[1])), Math.max(...poly.map((p) => p[0])), Math.max(...poly.map((p) => p[1]))].map((v) => v.toFixed(7));
+  const st = $('search-status'); st.className = 'status'; st.textContent = 'Searching…';
+  $('btn-search').disabled = true;
+  const base = `${GRAPH}/images?access_token=${encodeURIComponent(S.token)}&bbox=${bbox.join(',')}&limit=2000`;
+  try {
+    let data, detailed = true;
+    try { data = (await getJSON(`${base}&fields=${FIELDS}`)).data || []; }
+    catch (e) { detailed = false; data = (await getJSON(`${base}&fields=${MIN_FIELDS}`)).data || []; }
+    data = data.filter((im) => { const g = (im.computed_geometry || im.geometry); return g && distToSeg(g.coordinates[0], g.coordinates[1]) <= S.buffer; });
+    if (!detailed) {
+      st.textContent = `Fetching details for ${data.length} images…`;
+      data = (await pool(data, 6, (im) => getJSON(`${GRAPH}/${im.id}?access_token=${encodeURIComponent(S.token)}&fields=${FIELDS}`))).filter(Boolean);
+    }
+    S.found = data;
+    const by = new Map();
+    for (const im of data) { if (!by.has(im.sequence)) by.set(im.sequence, []); by.get(im.sequence).push(im); }
+    S.seqs = [...by.entries()].map(([id, a]) => ({
+      id, n: a.length, posed: a.filter((i) => i.computed_rotation && (i.exif_orientation == null || +i.exif_orientation <= 1)).length,
+      type: [...new Set(a.map((i) => i.camera_type || '?'))].join('/'),
+      t0: Math.min(...a.map((i) => i.captured_at)), t1: Math.max(...a.map((i) => i.captured_at)),
+    })).sort((x, y) => y.posed - x.posed || y.n - x.n);
+    S.seqSel = {}; if (S.seqs.length) S.seqSel[S.seqs[0].id] = true;
+    st.className = data.length ? 'status ok' : 'status warn';
+    st.innerHTML = data.length ? `<span class="mono">${data.length}</span> images in <span class="mono">${S.seqs.length}</span> sequences within ${S.buffer} m.` + (data.length >= 2000 ? ' The API limit was reached, so draw a shorter segment.' : '')
+      : 'No images within the buffer. Widen the buffer or move the segment onto a green coverage line.';
+    renderSeqs(); refreshMap();
+  } catch (e) {
+    st.className = 'status bad'; st.textContent = `Search failed: ${e.message}. Check the token and the internet connection.`;
+  } finally { $('btn-search').disabled = false; }
+}
+function renderSeqs() {
+  const el = $('seqlist');
+  if (!S.seqs.length) { el.innerHTML = '<p class="note">No search yet.</p>'; $('btn-use').disabled = true; return; }
+  el.innerHTML = S.seqs.map((s, i) => `<label class="seq"><input type="checkbox" data-seq="${esc(s.id)}" ${S.seqSel[s.id] ? 'checked' : ''}>
+    <span class="sw" style="background:${SEQ_COLORS[i % SEQ_COLORS.length]}"></span>
+    <span><span class="mono">${s.n}</span> images · ${esc(s.type)} · ${new Date(s.t0).toISOString().slice(0, 10)}${s.posed < s.n ? ` · <span class="pill warn">${s.n - s.posed} without pose</span>` : ''}</span></label>`).join('');
+  el.querySelectorAll('input').forEach((cb) => cb.addEventListener('change', () => { S.seqSel[cb.dataset.seq] = cb.checked; updateUse(); refreshMap(); }));
+  updateUse();
+}
+function selectedFound() { return S.found.filter((im) => S.seqSel[im.sequence] && im.computed_rotation && (im.exif_orientation == null || +im.exif_orientation <= 1)); }
+function updateUse() { const n = selectedFound().length; $('btn-use').disabled = !n; $('btn-use').textContent = n ? `Use ${n} selected images` : 'Use selected images'; }
+function useImages() {
+  const order = new Map(S.seqs.map((s, i) => [s.id, i]));
+  S.images = selectedFound().sort((a, b) => (order.get(a.sequence) - order.get(b.sequence)) || (a.captured_at - b.captured_at));
+  S.ref = computeRef(S.images); rebuildCams();
+  urlCache.clear();
+  S.cur = 0; buildStrip(); setTab('measure'); showImage(0); renderAll();
+}
+
+// ------------------------------------------------------------------ image access
+function urls(id) {
+  if (urlCache.has(id)) return urlCache.get(id);
+  if (!S.token) return Promise.reject(new Error('no Mapillary token'));
+  const p = getJSON(`${GRAPH}/${id}?access_token=${encodeURIComponent(S.token)}&fields=thumb_256_url,thumb_2048_url,thumb_original_url`)
+    .catch((e) => { urlCache.delete(id); throw e; });
+  urlCache.set(id, p); return p;
+}
+function loadImg(url) {
+  if (imgCache.has(url)) return imgCache.get(url);
+  const p = new Promise((res, rej) => { const im = new Image(); im.decoding = 'async'; im.onload = () => res(im); im.onerror = () => rej(new Error('image download failed')); im.src = url; });
+  imgCache.set(url, p); if (imgCache.size > 12) imgCache.delete(imgCache.keys().next().value);
+  p.catch(() => imgCache.delete(url));
+  return p;
+}
+async function imageUrlFor(id) { const u = await urls(id); return S.fullres ? (u.thumb_original_url || u.thumb_2048_url) : (u.thumb_2048_url || u.thumb_original_url); }
+
+// ------------------------------------------------------------------ viewer
+const V = { img: null, nw: 0, nh: 0, cx: 0.5, cy: 0.5, z: 1, req: 0, cw: 0, ch: 0, down: null, hover: null };
+const cv = $('cv'), ctx = cv.getContext('2d');
+function fitScale() { return Math.min(V.cw / V.nw, V.ch / V.nh); }
+function scale() { return fitScale() * V.z; }
+function i2s(ix, iy) { const s = scale(); return [V.cw / 2 + (ix - V.cx * V.nw) * s, V.ch / 2 + (iy - V.cy * V.nh) * s]; }
+function s2i(sx, sy) { const s = scale(); return [V.cx * V.nw + (sx - V.cw / 2) / s, V.cy * V.nh + (sy - V.ch / 2) / s]; }
+function resizeViewer() {
+  const r = $('viewer').getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  V.cw = r.width; V.ch = r.height; cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
+  drawViewer();
+}
+function fit() { V.z = 1; V.cx = 0.5; V.cy = 0.5; drawViewer(); }
+async function showImage(i) {
+  if (!S.images.length) { drawViewer(); return; }
+  S.cur = Math.max(0, Math.min(S.images.length - 1, i));
+  const im = S.images[S.cur], req = ++V.req;
+  $('v-idx').textContent = `${S.cur + 1} / ${S.images.length}`;
+  const c = cams.get(im.id);
+  $('v-info').textContent = `${im.id} · ${new Date(im.captured_at).toISOString().slice(0, 16).replace('T', ' ')} · ${c.code === 2 ? '360°' : (c.code === 1 ? 'fisheye' : 'perspective')} f=${c.code === 2 ? '–' : c.f.toFixed(3)}`;
+  $('v-link').href = `https://www.mapillary.com/app/?pKey=${encodeURIComponent(im.id)}`;
+  markStrip(); drawPlan();
+  try {
+    const url = await imageUrlFor(im.id);
+    const img = await loadImg(url);
+    if (req !== V.req) return;
+    V.img = img; V.nw = img.naturalWidth; V.nh = img.naturalHeight;
+    followActive();
+  } catch (e) {
+    if (req !== V.req) return;
+    V.img = null; toast(`Could not load image ${im.id}: ${e.message}`);
+  }
+  drawViewer(); renderActive();
+  if (S.images[S.cur + 1]) imageUrlFor(S.images[S.cur + 1].id).then(loadImg).catch(() => {});
+}
+function followActive() {
+  if (!S.follow || !S.active || !V.img) return;
+  const im = S.images[S.cur]; const own = S.observations.find((o) => o.image === im.id && o.point === S.active);
+  let f = own ? [own.x, own.y] : null;
+  if (!f) { const pr = predict(S.active, im.id); if (pr && pr.kind === 'point') f = pr.f; }
+  if (f && f[0] > -0.05 && f[0] < 1.05 && f[1] > -0.05 && f[1] < 1.05) { V.cx = f[0]; V.cy = f[1]; if (V.z < 2) V.z = 2.5; }
+}
+function obsFor(pointId, exceptImage) { return S.observations.filter((o) => o.point === pointId && o.image !== exceptImage && cams.has(o.image)); }
+function predict(pointId, imageId) {
+  const c = cams.get(imageId); if (!c) return null;
+  const ob = obsFor(pointId, imageId);
+  if (new Set(ob.map((o) => o.image)).size >= 2) {
+    const X = triangulate(ob.map((o) => rayOf(cams.get(o.image), o.x, o.y)));
+    if (!X) return null; const f = projWorld(c, X); return f ? { kind: 'point', f } : null;
+  }
+  if (ob.length === 1) {
+    const r = rayOf(cams.get(ob[0].image), ob[0].x, ob[0].y), segs = [], cur = [];
+    for (let k = 0; k <= 120; k++) {
+      const t = 1.5 * Math.pow(60, k / 120);
+      const f = projWorld(c, [r.C[0] + t * r.d[0], r.C[1] + t * r.d[1], r.C[2] + t * r.d[2]]);
+      if (!f || (cur.length && Math.abs(f[0] - cur[cur.length - 1][0]) > 0.4)) { if (cur.length > 1) segs.push(cur.splice(0)); else cur.length = 0; if (!f) continue; }
+      cur.push(f);
+    }
+    if (cur.length > 1) segs.push(cur);
+    return { kind: 'curve', segs };
+  }
+  return null;
+}
+function colorOfPoint(p) {
+  if (!p) return cssVar('--muted');
+  if (p.kind === 'wheel') return cssVar('--wheel');
+  const i = S.groups.indexOf(p.group);
+  return cssVar(`--g${(i < 0 ? 5 : i % 6) + 1}`);
+}
+function drawViewer() {
+  const dpr = window.devicePixelRatio || 1;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, V.cw, V.ch);
+  $('empty').style.display = S.images.length ? 'none' : 'grid';
+  if (!V.img || !S.images.length) return;
+  const s = scale(), [x0, y0] = i2s(0, 0);
+  ctx.imageSmoothingEnabled = s < 2;
+  ctx.drawImage(V.img, x0, y0, V.nw * s, V.nh * s);
+  const im = S.images[S.cur], c = cams.get(im.id);
+  const toS = (f) => i2s(f[0] * V.nw, f[1] * V.nh);
+  ctx.font = '12px "IBM Plex Mono", monospace'; ctx.lineJoin = 'round';
+  const label = (txt, x, y, col) => { ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.75)'; ctx.strokeText(txt, x, y); ctx.fillStyle = col; ctx.fillText(txt, x, y); };
+  // projections of all triangulated points
+  if (S.showProj && QL) {
+    for (const p of S.points) {
+      const q = QL.pts[p.id]; if (!q || !q.X || p.id === S.active) continue;
+      if (S.observations.some((o) => o.image === im.id && o.point === p.id)) continue;
+      const dist = nrm(sub(q.X, c.C)); if (dist > 30) continue;
+      const f = projWorld(c, q.X); if (!f || f[0] < 0 || f[0] > 1 || f[1] < 0 || f[1] > 1) continue;
+      const [sx, sy] = toS(f);
+      ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+      ctx.beginPath(); ctx.arc(sx, sy, 6, 0, 2 * Math.PI); ctx.stroke(); ctx.setLineDash([]);
+      if (dist < 15 || V.z > 2) label(p.id, sx + 8, sy - 8, 'rgba(255,255,255,.8)');
+    }
+  }
+  // active point prediction
+  if (S.active) {
+    const pr = predict(S.active, im.id), col = colorOfPoint(S.points.find((p) => p.id === S.active));
+    if (pr && pr.kind === 'point') {
+      const [sx, sy] = toS(pr.f);
+      ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.setLineDash([5, 4]);
+      ctx.beginPath(); ctx.arc(sx, sy, 16, 0, 2 * Math.PI); ctx.stroke(); ctx.setLineDash([]);
+    } else if (pr && pr.kind === 'curve') {
+      ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.setLineDash([6, 4]);
+      for (const sg of pr.segs) { ctx.beginPath(); sg.forEach((f, k) => { const [sx, sy] = toS(f); k ? ctx.lineTo(sx, sy) : ctx.moveTo(sx, sy); }); ctx.stroke(); }
+      ctx.setLineDash([]);
+    }
+  }
+  // observations in this image
+  for (const o of S.observations) {
+    if (o.image !== im.id) continue;
+    const p = S.points.find((q) => q.id === o.point), col = colorOfPoint(p), act = o.point === S.active;
+    const [sx, sy] = toS([o.x, o.y]), r = act ? 9 : 7;
+    ctx.lineWidth = act ? 2.5 : 1.8; ctx.strokeStyle = 'rgba(0,0,0,.6)';
+    ctx.beginPath(); ctx.arc(sx, sy, r + 1, 0, 2 * Math.PI); ctx.stroke();
+    ctx.strokeStyle = col; ctx.beginPath(); ctx.arc(sx, sy, r, 0, 2 * Math.PI); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(sx - r - 5, sy); ctx.lineTo(sx - 2, sy); ctx.moveTo(sx + 2, sy); ctx.lineTo(sx + r + 5, sy);
+    ctx.moveTo(sx, sy - r - 5); ctx.lineTo(sx, sy - 2); ctx.moveTo(sx, sy + 2); ctx.lineTo(sx, sy + r + 5); ctx.stroke();
+    label(o.point, sx + r + 4, sy - r - 2, col);
+  }
+}
+function placeObs(xf, yf) {
+  if (!S.active) { toast('Select a target first: a hub of a car or an edge point.'); return; }
+  const im = S.images[S.cur];
+  S.observations = S.observations.filter((o) => !(o.image === im.id && o.point === S.active));
+  S.observations.push({ image: im.id, point: S.active, x: +xf.toFixed(6), y: +yf.toFixed(6), display_long: Math.max(V.nw, V.nh) });
+  changed();
+}
+function deleteNear(sx, sy) {
+  const im = S.images[S.cur]; let best = null, bd = 14;
+  for (const o of S.observations) { if (o.image !== im.id) continue; const [x, y] = i2s(o.x * V.nw, o.y * V.nh); const d = Math.hypot(x - sx, y - sy); if (d < bd) { bd = d; best = o; } }
+  if (best) { S.observations = S.observations.filter((o) => o !== best); changed(); toast(`Removed ${best.point} from this image.`); }
+}
+cv.addEventListener('wheel', (e) => {
+  e.preventDefault(); if (!V.img) return;
+  const r = cv.getBoundingClientRect(), sx = e.clientX - r.left, sy = e.clientY - r.top;
+  const [ix, iy] = s2i(sx, sy);
+  V.z = Math.max(0.3, Math.min(60, V.z * Math.pow(1.0015, -e.deltaY)));
+  const s = scale(); V.cx = (ix - (sx - V.cw / 2) / s) / V.nw; V.cy = (iy - (sy - V.ch / 2) / s) / V.nh;
+  drawViewer();
+}, { passive: false });
+cv.addEventListener('pointerdown', (e) => { if (e.button !== 0) return; cv.setPointerCapture(e.pointerId); V.down = { x: e.clientX, y: e.clientY, cx: V.cx, cy: V.cy, moved: false }; });
+cv.addEventListener('pointermove', (e) => {
+  if (!V.down || !V.img) return;
+  const dx = e.clientX - V.down.x, dy = e.clientY - V.down.y;
+  if (!V.down.moved && Math.hypot(dx, dy) > 4) V.down.moved = true;
+  if (V.down.moved) { const s = scale(); V.cx = V.down.cx - dx / (s * V.nw); V.cy = V.down.cy - dy / (s * V.nh); drawViewer(); }
+});
+cv.addEventListener('pointerup', (e) => {
+  if (!V.down) return; const d = V.down; V.down = null;
+  if (d.moved || !V.img) return;
+  const r = cv.getBoundingClientRect(), [ix, iy] = s2i(e.clientX - r.left, e.clientY - r.top);
+  if (ix < 0 || iy < 0 || ix > V.nw || iy > V.nh) return;
+  placeObs(ix / V.nw, iy / V.nh);
+});
+cv.addEventListener('contextmenu', (e) => { e.preventDefault(); const r = cv.getBoundingClientRect(); deleteNear(e.clientX - r.left, e.clientY - r.top); });
+
+// ------------------------------------------------------------------ strip
+let stripObs = null;
+function buildStrip() {
+  const el = $('strip'); el.innerHTML = '';
+  if (stripObs) stripObs.disconnect();
+  stripObs = new IntersectionObserver((ents) => {
+    for (const en of ents) {
+      if (!en.isIntersecting) continue;
+      const b = en.target, id = b.dataset.id; stripObs.unobserve(b);
+      urls(id).then((u) => { const img = b.querySelector('img'); if (u && u.thumb_256_url) img.src = u.thumb_256_url; }).catch(() => {});
+    }
+  }, { root: el, rootMargin: '200px' });
+  S.images.forEach((im, i) => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'th'; b.dataset.i = i; b.dataset.id = im.id;
+    const si = S.seqs.findIndex((s) => s.id === im.sequence);
+    b.innerHTML = `<span class="seqbar" style="background:${SEQ_COLORS[(si < 0 ? 0 : si) % SEQ_COLORS.length]}"></span><img alt="Image ${i + 1}" src="data:image/gif;base64,R0lGODlhAQABAAAAACw="><span class="idx">${i + 1}</span><span class="cnt">0</span>`;
+    b.addEventListener('click', () => showImage(i));
+    el.appendChild(b); stripObs.observe(b);
+  });
+  markStrip();
+}
+function markStrip() {
+  const counts = new Map(), act = new Set();
+  for (const o of S.observations) { counts.set(o.image, (counts.get(o.image) || 0) + 1); if (o.point === S.active) act.add(o.image); }
+  document.querySelectorAll('#strip .th').forEach((b) => {
+    const i = +b.dataset.i, id = b.dataset.id;
+    b.classList.toggle('cur', i === S.cur);
+    b.querySelector('.cnt').textContent = counts.get(id) || 0;
+    let dot = b.querySelector('.act');
+    if (act.has(id) && !dot) { dot = document.createElement('span'); dot.className = 'act'; b.appendChild(dot); }
+    if (!act.has(id) && dot) dot.remove();
+    if (i === S.cur && b.scrollIntoView) b.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  });
+}
+
+// ------------------------------------------------------------------ quick look
+function widthBetween(PA, PB, axis) {
+  if (!PA.length || !PB.length) return null;
+  const mean = (P) => [P.reduce((s, p) => s + p[0], 0) / P.length, P.reduce((s, p) => s + p[1], 0) / P.length];
+  const mA = mean(PA), mB = mean(PB); let d;
+  if ((PA.length >= 2 || PB.length >= 2) && PA.length + PB.length >= 3) {
+    let sxx = 0, sxy = 0, syy = 0;
+    for (const [P, m] of [[PA, mA], [PB, mB]]) for (const p of P) { const x = p[0] - m[0], y = p[1] - m[1]; sxx += x * x; sxy += x * y; syy += y * y; }
+    const th = 0.5 * Math.atan2(2 * sxy, sxx - syy); d = [Math.cos(th), Math.sin(th)];
+  } else if (axis) d = axis; else return null;
+  const n = [-d[1], d[0]];
+  return Math.abs(n[0] * (mB[0] - mA[0]) + n[1] * (mB[1] - mA[1]));
+}
+function computeQuick() {
+  const q = { pts: {}, cars: [], widths: [], scale: null, heading: null };
+  const by = new Map();
+  for (const o of S.observations) { if (!cams.has(o.image)) continue; if (!by.has(o.point)) by.set(o.point, []); by.get(o.point).push(o); }
+  for (const p of S.points) {
+    const ob = by.get(p.id) || [], nimg = new Set(ob.map((o) => o.image)).size, rec = { n: ob.length, nimg, X: null, rms: null, ang: null };
+    if (nimg >= 2) {
+      const rays = ob.map((o) => rayOf(cams.get(o.image), o.x, o.y)), X = triangulate(rays);
+      if (X) {
+        rec.X = X; let ss = 0, k = 0, amax = 0;
+        for (const o of ob) {
+          const c = cams.get(o.image), f = projWorld(c, X), dl = o.display_long || S.settings.display_long_side;
+          if (!f) { ss += 1e4; k++; continue; }
+          const dx = (f[0] - o.x) * c.w * dl / c.s, dy = (f[1] - o.y) * c.h * dl / c.s; ss += dx * dx + dy * dy; k++;
+        }
+        for (let i = 0; i < rays.length; i++) for (let j = i + 1; j < rays.length; j++) amax = Math.max(amax, Math.acos(Math.max(-1, Math.min(1, dot(rays[i].d, rays[j].d)))) / D2R);
+        rec.rms = Math.sqrt(ss / k); rec.ang = amax;
+      }
+    }
+    q.pts[p.id] = rec;
+  }
+  for (const c of S.cars) {
+    const F = q.pts[`${c.id}.F`], R = q.pts[`${c.id}.R`];
+    const d = F && R && F.X && R.X ? nrm(sub(F.X, R.X)) : null;
+    q.cars.push({ id: c.id, nF: F ? F.nimg : 0, nR: R ? R.nimg : 0, d, L: +c.wheelbase_m || null, ratio: d && +c.wheelbase_m ? +c.wheelbase_m / d : null });
+  }
+  const ratios = q.cars.map((c) => c.ratio).filter((x) => x);
+  if (ratios.length) { const m = median(ratios), sd = ratios.length > 1 ? Math.sqrt(ratios.reduce((s, r) => s + (r - m) ** 2, 0) / (ratios.length - 1)) : null; q.scale = { m, sd, n: ratios.length }; }
+  const ax = segAxis();
+  for (const pr of S.pairs) {
+    const pa = S.points.filter((p) => p.group === pr.a && q.pts[p.id] && q.pts[p.id].X).map((p) => q.pts[p.id].X);
+    const pb = S.points.filter((p) => p.group === pr.b && q.pts[p.id] && q.pts[p.id].X).map((p) => q.pts[p.id].X);
+    const w = widthBetween(pa, pb, ax ? ax.d : null);
+    q.widths.push({ name: pr.name, w, ws: w != null && q.scale ? w * q.scale.m : null, gt: S.gt[pr.name] != null && S.gt[pr.name] !== '' ? +S.gt[pr.name] : null, nA: pa.length, nB: pb.length });
+  }
+  const dh = S.images.filter((im) => im.computed_compass_angle != null && cams.has(im.id)).map((im) => (((heading(cams.get(im.id)) - im.computed_compass_angle) % 360) + 540) % 360 - 180);
+  if (dh.length) q.heading = { mean: dh.reduce((a, b) => a + b, 0) / dh.length, max: Math.max(...dh.map(Math.abs)) };
+  return q;
+}
+function renderQuick() {
+  const q = QL, el = $('quick');
+  let h = '';
+  if (q.heading) {
+    const cls = q.heading.max < 3 ? 'ok' : q.heading.max < 10 ? 'warn' : 'bad';
+    h += `<div class="status ${cls}">Pose check: camera axis vs compass angle, mean <span class="mono">${q.heading.mean.toFixed(2)}°</span>, max <span class="mono">${q.heading.max.toFixed(2)}°</span>${cls === 'bad' ? '. The pose convention does not match these images; tell Claude.' : ''}</div>`;
+  }
+  if (q.cars.length) {
+    h += `<table><thead><tr><th>car</th><th>frames F/R</th><th>d Mapillary</th><th>L</th><th>L/d</th></tr></thead><tbody>${q.cars.map((c) => `<tr><td class="mono">${esc(c.id)}</td><td>${c.nF}/${c.nR}</td><td>${fmt(c.d)}</td><td>${fmt(c.L)}</td><td>${fmt(c.ratio, 4)}</td></tr>`).join('')}</tbody></table>`;
+    if (q.scale) h += `<p class="note">Scale from ${q.scale.n} car${q.scale.n > 1 ? 's' : ''}: median L/d <span class="mono">${q.scale.m.toFixed(4)}</span>${q.scale.sd != null ? `, spread <span class="mono">${(100 * q.scale.sd).toFixed(1)}%</span>` : ''}. With forward-facing frames a single car's L/d scatters by several percent until the adjustment refines the orientations.</p>`;
+  }
+  const ws = q.widths.filter((w) => w.w != null);
+  if (ws.length) {
+    h += `<table><thead><tr><th>width (m)</th><th>Mapillary</th><th>× car scale</th><th>tape</th></tr></thead><tbody>${ws.map((w) => `<tr><td>${esc(w.name)}</td><td>${fmt(w.w)}</td><td>${fmt(w.ws)}</td><td>${fmt(w.gt)}</td></tr>`).join('')}</tbody></table>`;
+  }
+  const bad = S.points.filter((p) => q.pts[p.id] && q.pts[p.id].rms != null && q.pts[p.id].rms > 4);
+  const weak = S.points.filter((p) => q.pts[p.id] && q.pts[p.id].ang != null && q.pts[p.id].ang < 3);
+  const single = S.points.filter((p) => q.pts[p.id] && q.pts[p.id].nimg === 1);
+  if (bad.length) h += `<div class="status bad">Large reprojection error (&gt; 4 px), likely a wrong match: ${bad.map((p) => `<span class="mono">${esc(p.id)}</span> ${q.pts[p.id].rms.toFixed(1)} px`).join(', ')}</div>`;
+  if (weak.length) h += `<div class="status warn">Rays nearly parallel (&lt; 3°), click in frames further apart: ${weak.map((p) => `<span class="mono">${esc(p.id)}</span>`).join(', ')}</div>`;
+  if (single.length) h += `<div class="status warn">Clicked in one frame only: ${single.map((p) => `<span class="mono">${esc(p.id)}</span>`).join(', ')}</div>`;
+  h += `<p class="note">Rigorous values come from the bundle adjustment: export the JSON and send it to Claude.</p>`;
+  el.innerHTML = h;
+}
+
+// ------------------------------------------------------------------ plan view
+const plan = $('plan'), pctx = plan.getContext('2d');
+let planCams = [];
+function drawPlan() {
+  const r = plan.getBoundingClientRect(); if (!r.width) return;
+  const dpr = window.devicePixelRatio || 1; plan.width = Math.round(r.width * dpr); plan.height = Math.round(r.height * dpr);
+  pctx.setTransform(dpr, 0, 0, dpr, 0, 0); pctx.clearRect(0, 0, r.width, r.height);
+  const ax = segAxis(); planCams = [];
+  if (!ax || !S.images.length) { pctx.fillStyle = cssVar('--muted'); pctx.font = '12px sans-serif'; pctx.fillText('Plan view appears after images are selected.', 10, 20); return; }
+  const left = [-ax.d[1], ax.d[0]];
+  const toSC = (X) => [(X[0] - ax.o[0]) * ax.d[0] + (X[1] - ax.o[1]) * ax.d[1], (X[0] - ax.o[0]) * left[0] + (X[1] - ax.o[1]) * left[1]];
+  const camSC = S.images.map((im) => toSC(cams.get(im.id).C));
+  let a0 = Math.min(0, ...camSC.map((p) => p[0])) - 3, a1 = Math.max(ax.L, ...camSC.map((p) => p[0])) + 3;
+  const cb = Math.max(S.buffer, ...camSC.map((p) => Math.abs(p[1]))) + 2;
+  const pad = 14, W = r.width - 2 * pad, H = r.height - 2 * pad, k = Math.min(W / (a1 - a0), H / (2 * cb));
+  const P = (a, c) => [pad + (a - a0) * k + (W - (a1 - a0) * k) / 2, r.height / 2 - c * k];
+  // grid: 5 m ticks along the axis
+  pctx.strokeStyle = cssVar('--line'); pctx.lineWidth = 1;
+  for (let a = Math.ceil(a0 / 5) * 5; a <= a1; a += 5) { const [x] = P(a, 0); pctx.beginPath(); pctx.moveTo(x, pad); pctx.lineTo(x, r.height - pad); pctx.stroke(); }
+  pctx.setLineDash([4, 4]); pctx.strokeStyle = cssVar('--accent');
+  let [x, y] = P(0, 0), [x2, y2] = P(ax.L, 0); pctx.beginPath(); pctx.moveTo(x, y); pctx.lineTo(x2, y2); pctx.stroke(); pctx.setLineDash([]);
+  pctx.fillStyle = cssVar('--muted'); pctx.font = '11px "IBM Plex Mono", monospace';
+  pctx.fillText('L', pad, pad + 10); pctx.fillText('R', pad, r.height - pad);
+  pctx.fillText('5 m grid', r.width - pad - 52, r.height - 4);
+  // cameras
+  S.images.forEach((im, i) => {
+    const c = cams.get(im.id), [sx, sy] = P(...camSC[i]); planCams.push([sx, sy, i]);
+    const cur = i === S.cur;
+    if (cur && c.code !== 2) {
+      const ax3 = [c.R[2][0], c.R[2][1]], v = [ax3[0] * ax.d[0] + ax3[1] * ax.d[1], ax3[0] * left[0] + ax3[1] * left[1]];
+      pctx.strokeStyle = cssVar('--accent'); pctx.lineWidth = 2; pctx.beginPath(); pctx.moveTo(sx, sy); pctx.lineTo(sx + v[0] * 22, sy - v[1] * 22); pctx.stroke();
+    }
+    pctx.fillStyle = cur ? cssVar('--accent') : cssVar('--muted');
+    pctx.beginPath(); pctx.arc(sx, sy, cur ? 4.5 : 2.5, 0, 2 * Math.PI); pctx.fill();
+  });
+  if (!QL) return;
+  // cars
+  for (const c of S.cars) {
+    const F = QL.pts[`${c.id}.F`], R = QL.pts[`${c.id}.R`];
+    if (F && R && F.X && R.X) { const [ax1, ay1] = P(...toSC(F.X)), [ax2, ay2] = P(...toSC(R.X)); pctx.strokeStyle = cssVar('--wheel'); pctx.lineWidth = 3; pctx.beginPath(); pctx.moveTo(ax1, ay1); pctx.lineTo(ax2, ay2); pctx.stroke(); pctx.fillStyle = cssVar('--wheel'); pctx.fillText(c.id, (ax1 + ax2) / 2 - 8, (ay1 + ay2) / 2 - 6); }
+  }
+  for (const p of S.points) {
+    const q = QL.pts[p.id]; if (!q || !q.X) continue;
+    const [sx, sy] = P(...toSC(q.X)); pctx.fillStyle = colorOfPoint(p);
+    pctx.beginPath(); pctx.arc(sx, sy, p.id === S.active ? 5 : 3, 0, 2 * Math.PI); pctx.fill();
+  }
+}
+plan.addEventListener('click', (e) => {
+  const r = plan.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+  let best = null, bd = 12; for (const [sx, sy, i] of planCams) { const d = Math.hypot(sx - x, sy - y); if (d < bd) { bd = d; best = i; } }
+  if (best != null) showImage(best);
+});
+
+// ------------------------------------------------------------------ side panels
+function nextNum(prefix, ids) { let n = 0; for (const id of ids) { const m = id.match(new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\d+)`)); if (m) n = Math.max(n, +m[1]); } return n + 1; }
+function obsCount(pid) { return new Set(S.observations.filter((o) => o.point === pid && cams.has(o.image)).map((o) => o.image)).size; }
+function renderCars() {
+  const el = $('cars');
+  if (!S.cars.length) { el.innerHTML = '<p class="note">No cars yet.</p>'; return; }
+  el.innerHTML = S.cars.map((c) => {
+    const qc = QL && QL.cars.find((x) => x.id === c.id);
+    const t = (pos, lab) => { const pid = `${c.id}.${pos}`, n = obsCount(pid); return `<button type="button" class="tgt ${S.active === pid ? 'on' : ''} ${n < 2 ? 'zero' : ''}" data-pt="${pid}">${lab}<b>${n}</b></button>`; };
+    return `<div class="car" data-car="${esc(c.id)}">
+      <div class="car-head"><span class="cid">${esc(c.id)}</span>
+        <input class="model" list="lookup-list" value="${esc(c.model || '')}" placeholder="model and generation" aria-label="Model of ${esc(c.id)}">
+        <input class="wb mono" type="number" step="0.001" min="1" max="6" value="${c.wheelbase_m ?? ''}" placeholder="L (m)" aria-label="Wheelbase of ${esc(c.id)} in metres">
+        <button type="button" class="x" title="Delete ${esc(c.id)}" aria-label="Delete ${esc(c.id)}">×</button></div>
+      <div class="car-hubs">${t('F', 'Front hub')}${t('R', 'Rear hub')}<span class="mini mono">${qc && qc.d ? `d ${qc.d.toFixed(3)} m` : ''}${qc && qc.ratio ? ` · L/d ${qc.ratio.toFixed(3)}` : ''}</span></div></div>`;
+  }).join('');
+  el.querySelectorAll('.car').forEach((row) => {
+    const c = S.cars.find((x) => x.id === row.dataset.car);
+    row.querySelector('.model').addEventListener('change', (e) => {
+      c.model = e.target.value; const hit = S.lookup.find((l) => l.model.toLowerCase() === c.model.trim().toLowerCase());
+      if (hit) { c.wheelbase_m = hit.L; row.querySelector('.wb').value = hit.L; }
+      softChanged();
+    });
+    row.querySelector('.wb').addEventListener('change', (e) => { const v = parseFloat(e.target.value); c.wheelbase_m = isFinite(v) ? v : null; softChanged(); });
+    row.querySelector('.x').addEventListener('click', () => {
+      S.cars = S.cars.filter((x) => x !== c);
+      const ids = new Set([`${c.id}.F`, `${c.id}.R`]);
+      S.points = S.points.filter((p) => !ids.has(p.id)); S.observations = S.observations.filter((o) => !ids.has(o.point));
+      if (ids.has(S.active)) S.active = null; changed();
+    });
+  });
+  el.querySelectorAll('.tgt').forEach((b) => b.addEventListener('click', () => setActive(b.dataset.pt)));
+}
+function renderPoints() {
+  const sel = $('grp-sel'), cur = sel.value;
+  sel.innerHTML = S.groups.map((g) => `<option value="${esc(g)}">${esc(g)}</option>`).join('');
+  if (S.groups.includes(cur)) sel.value = cur;
+  for (const id of ['pair-a', 'pair-b']) { const s = $(id), v = s.value; s.innerHTML = S.groups.map((g) => `<option>${esc(g)}</option>`).join(''); if (S.groups.includes(v)) s.value = v; }
+  const el = $('points');
+  el.innerHTML = S.groups.map((g, gi) => {
+    const pts = S.points.filter((p) => p.kind === 'edge' && p.group === g);
+    return `<div class="grp"><div class="grp-h"><span class="sw" style="background:var(--g${(gi % 6) + 1})"></span>${esc(g)}<span class="mini">${pts.length} points</span></div>
+      <div class="chips">${pts.map((p) => { const n = obsCount(p.id); return `<span class="chip"><button type="button" class="tgt ${S.active === p.id ? 'on' : ''} ${n < 2 ? 'zero' : ''}" data-pt="${esc(p.id)}">${esc(p.id.split('.').pop())}<b>${n}</b></button><button type="button" class="del" data-del="${esc(p.id)}" aria-label="Delete ${esc(p.id)}">×</button></span>`; }).join('')}</div></div>`;
+  }).join('');
+  el.querySelectorAll('.tgt').forEach((b) => b.addEventListener('click', () => setActive(b.dataset.pt)));
+  el.querySelectorAll('.del').forEach((b) => b.addEventListener('click', () => {
+    const id = b.dataset.del; S.points = S.points.filter((p) => p.id !== id); S.observations = S.observations.filter((o) => o.point !== id);
+    if (S.active === id) S.active = null; changed();
+  }));
+}
+function renderPairs() {
+  const el = $('pairs');
+  el.innerHTML = S.pairs.map((p, i) => `<div class="pair"><span>${esc(p.name)} <code>${esc(p.a)} ↔ ${esc(p.b)}</code> <button type="button" class="x" data-i="${i}" aria-label="Remove ${esc(p.name)}">×</button></span>
+    <input type="number" step="0.01" min="0" class="mono" data-gt="${esc(p.name)}" value="${S.gt[p.name] ?? ''}" placeholder="tape (m)" aria-label="Tape measurement for ${esc(p.name)}"></div>`).join('');
+  el.querySelectorAll('[data-gt]').forEach((inp) => inp.addEventListener('change', () => { const v = parseFloat(inp.value); S.gt[inp.dataset.gt] = isFinite(v) ? v : null; softChanged(); }));
+  el.querySelectorAll('.x').forEach((b) => b.addEventListener('click', () => { S.pairs.splice(+b.dataset.i, 1); changed(); }));
+}
+function renderActive() {
+  const el = $('active-line'), hint = $('hint');
+  if (!S.active) { el.className = 'status'; el.textContent = 'No active target. Select a hub or an edge point below.'; hint.innerHTML = 'Select a target on the right, then click it in the image.'; return; }
+  const p = S.points.find((x) => x.id === S.active), n = obsCount(S.active);
+  const what = p && p.kind === 'wheel' ? `${p.car} ${p.pos} hub` : S.active;
+  const here = S.images[S.cur] && S.observations.some((o) => o.point === S.active && o.image === S.images[S.cur].id);
+  el.className = n >= 2 ? 'status ok' : 'status warn';
+  el.innerHTML = `Active: <b class="mono">${esc(what)}</b> · clicked in <span class="mono">${n}</span> frame${n === 1 ? '' : 's'}${here ? ' · placed in this frame' : ''}`;
+  const pr = S.images.length ? predict(S.active, S.images[S.cur].id) : null;
+  hint.innerHTML = `<b>${esc(what)}</b> · click to place${pr ? (pr.kind === 'point' ? ' · dashed ring = predicted position' : ' · dashed curve = epipolar line') : ''} · right-click a mark to delete`;
+}
+function setActive(pid) { S.active = pid; renderCars(); renderPoints(); renderActive(); markStrip(); followActive(); drawViewer(); drawPlan(); }
+function renderAll() { QL = computeQuick(); renderCars(); renderPoints(); renderPairs(); renderQuick(); renderActive(); markStrip(); drawPlan(); drawViewer(); }
+let pending = false;
+function changed() {
+  // structural change: rebuild the lists after the current event finishes (avoids re-entrant innerHTML during blur)
+  if (pending) return; pending = true;
+  queueMicrotask(() => { pending = false; QL = computeQuick(); renderCars(); renderPoints(); renderPairs(); renderQuick(); renderActive(); markStrip(); drawPlan(); drawViewer(); autosave(); });
+}
+function softChanged() {
+  // value edits in inputs: refresh numbers only, keep the DOM (and keyboard focus) as it is
+  QL = computeQuick(); renderQuick(); drawPlan(); autosave();
+  document.querySelectorAll('#cars .car').forEach((row) => {
+    const qc = QL.cars.find((x) => x.id === row.dataset.car), sp = row.querySelector('.car-hubs .mini');
+    if (sp) sp.textContent = `${qc && qc.d ? `d ${qc.d.toFixed(3)} m` : ''}${qc && qc.ratio ? ` · L/d ${qc.ratio.toFixed(3)}` : ''}`;
+  });
+}
+
+function parseLookup(txt) {
+  S.lookup = txt.split(/\r?\n/).map((l) => l.split(/[;\t]|,(?=\s*\d)/)).filter((a) => a.length >= 2 && isFinite(parseFloat(a[1]))).map((a) => ({ model: a[0].trim(), L: parseFloat(a[1]) }));
+  $('lookup-list').innerHTML = S.lookup.map((l) => `<option value="${esc(l.model)}">${l.L.toFixed(3)} m</option>`).join('');
+}
+
+// ------------------------------------------------------------------ tabs, buttons, keys
+function setTab(t) {
+  $('tab-select').classList.toggle('on', t === 'select'); $('tab-measure').classList.toggle('on', t === 'measure');
+  $('ws-select').classList.toggle('on', t === 'select'); $('ws-measure').classList.toggle('on', t === 'measure');
+  if (t === 'select' && map) setTimeout(() => { map.resize(); refreshMap(); }, 0);
+  if (t === 'measure') setTimeout(() => { resizeViewer(); drawPlan(); }, 0);
+}
+$('tab-select').addEventListener('click', () => setTab('select'));
+$('tab-measure').addEventListener('click', () => setTab('measure'));
+$('token').value = S.token;
+$('token').addEventListener('change', () => { S.token = $('token').value.trim(); LS.set('swl-token', S.token); urlCache.clear(); addCoverage(); toast(S.token ? 'Token saved in this browser.' : 'Token cleared.'); if (S.images.length) { buildStrip(); showImage(S.cur); } });
+$('btn-draw').addEventListener('click', startDraw);
+$('buffer').addEventListener('input', () => { S.buffer = +$('buffer').value; $('buffer-v').textContent = `${S.buffer} m`; refreshMap(); });
+$('buffer').addEventListener('change', autosave);
+$('btn-goto').addEventListener('click', () => {
+  const m = $('goto').value.match(/(-?\d+(?:\.\d+)?)\s*[,;\s]\s*(-?\d+(?:\.\d+)?)/);
+  if (!m || !map) { toast('Type latitude and longitude, for example -25.4396, -49.2689.'); return; }
+  map.jumpTo({ center: [+m[2], +m[1]], zoom: 18 });
+});
+$('goto').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('btn-goto').click(); });
+$('btn-search').addEventListener('click', search);
+$('seq-all').addEventListener('click', () => { S.seqs.forEach((s) => { S.seqSel[s.id] = true; }); renderSeqs(); refreshMap(); });
+$('seq-none').addEventListener('click', () => { S.seqSel = {}; renderSeqs(); refreshMap(); });
+$('btn-use').addEventListener('click', useImages);
+$('v-prev').addEventListener('click', () => showImage(S.cur - 1));
+$('v-next').addEventListener('click', () => showImage(S.cur + 1));
+$('v-fit').addEventListener('click', fit);
+$('v-full').addEventListener('change', () => { S.fullres = $('v-full').checked; showImage(S.cur); });
+$('v-proj').addEventListener('change', () => { S.showProj = $('v-proj').checked; drawViewer(); });
+$('v-follow').addEventListener('change', () => { S.follow = $('v-follow').checked; });
+$('add-car').addEventListener('click', () => {
+  const id = `C${nextNum('C', S.cars.map((c) => c.id))}`;
+  S.cars.push({ id, model: '', wheelbase_m: null, sigma_m: 0.01 });
+  S.points.push({ id: `${id}.F`, kind: 'wheel', car: id, pos: 'front' }, { id: `${id}.R`, kind: 'wheel', car: id, pos: 'rear' });
+  S.active = `${id}.F`; changed();
+  setTimeout(() => { const inp = document.querySelector(`.car[data-car="${id}"] .model`); if (inp) inp.focus(); }, 0);
+});
+$('add-pt').addEventListener('click', () => {
+  const g = $('grp-sel').value; if (!g) return;
+  const id = `${g}.${nextNum(`${g}.`, S.points.filter((p) => p.group === g).map((p) => p.id))}`;
+  S.points.push({ id, kind: 'edge', group: g }); S.active = id; changed();
+});
+$('add-grp').addEventListener('click', () => {
+  const g = $('grp-new').value.trim().replace(/\s+/g, '_').replace(/[^\w-]/g, '');
+  if (!g || S.groups.includes(g)) { toast('Type a new, unique group name.'); return; }
+  S.groups.push(g); $('grp-new').value = ''; renderPoints(); $('grp-sel').value = g; autosave();
+});
+$('add-pair').addEventListener('click', () => {
+  const a = $('pair-a').value, b = $('pair-b').value, name = $('pair-name').value.trim() || `${a} to ${b}`;
+  if (!a || !b || a === b) { toast('Pick two different groups.'); return; }
+  S.pairs.push({ name, a, b }); $('pair-name').value = ''; changed();
+});
+$('sig').addEventListener('change', () => { const v = parseFloat($('sig').value); if (isFinite(v) && v > 0) { S.settings.sigma_click_px = v; autosave(); } });
+$('lookup').value = LS.get('swl-lookup', '');
+parseLookup($('lookup').value);
+$('lookup').addEventListener('change', () => { LS.set('swl-lookup', $('lookup').value); parseLookup($('lookup').value); toast(`${S.lookup.length} models in the lookup table.`); });
+$('btn-new').addEventListener('click', () => {
+  if ($('btn-new').dataset.armed !== '1') { $('btn-new').dataset.armed = '1'; $('btn-new').textContent = 'Click again to discard this project'; setTimeout(() => { $('btn-new').dataset.armed = ''; $('btn-new').textContent = 'Start a new project'; }, 4000); return; }
+  LS.del('swl-project'); loadProjectObj({}); $('btn-new').dataset.armed = ''; $('btn-new').textContent = 'Start a new project';
+  buildStrip(); V.img = null; renderAll(); refreshMap(); renderSeqs(); setTab('select');
+});
+function exportName() { return `street-width-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')}.json`; }
+$('btn-export').addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify(projectObj(), null, 1)], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = exportName(); document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  toast('Project exported. Send the JSON file to Claude for the adjustment.');
+});
+$('btn-copy').addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText(JSON.stringify(projectObj())); toast('Project JSON copied.'); } catch (e) { toast('Copy was blocked by the browser; use Export JSON.'); }
+});
+$('btn-import').addEventListener('click', () => $('file-import').click());
+$('file-import').addEventListener('change', async () => {
+  const f = $('file-import').files[0]; if (!f) return;
+  try {
+    const d = JSON.parse(await f.text()); if (d.format !== 'mly-scalebar-project/1') throw new Error('not a Street-width lab project');
+    loadProjectObj(d); urlCache.clear(); buildStrip(); renderAll(); refreshMap(); renderSeqs(); setTab(S.images.length ? 'measure' : 'select'); if (S.images.length) showImage(0); autosave();
+    toast(`Imported ${S.images.length} images, ${S.observations.length} clicks.`);
+  } catch (e) { toast(`Import failed: ${e.message}`); }
+  $('file-import').value = '';
+});
+$('btn-help').addEventListener('click', () => { $('help').hidden = false; $('help-close').focus(); });
+$('help-close').addEventListener('click', () => { $('help').hidden = true; });
+$('help').addEventListener('click', (e) => { if (e.target === $('help')) $('help').hidden = true; });
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { if (!$('help').hidden) { $('help').hidden = true; return; } }
+  const tag = (e.target.tagName || '').toLowerCase();
+  if (['input', 'textarea', 'select'].includes(tag)) return;
+  if (!$('ws-measure').classList.contains('on')) return;
+  const k = e.key;
+  if (k === 'ArrowRight' || k === 'd' || k === 'D') { e.preventDefault(); showImage(S.cur + 1); }
+  else if (k === 'ArrowLeft' || k === 'a' || k === 'A') { e.preventDefault(); showImage(S.cur - 1); }
+  else if (k === 'f' || k === 'F') fit();
+  else if (k === 'p' || k === 'P') { S.showProj = !S.showProj; $('v-proj').checked = S.showProj; drawViewer(); }
+  else if (k === 'Escape') setActive(null);
+  else if ((k === 'Delete' || k === 'Backspace') && S.active && S.images.length) {
+    const id = S.images[S.cur].id; const before = S.observations.length;
+    S.observations = S.observations.filter((o) => !(o.image === id && o.point === S.active)); if (S.observations.length !== before) changed();
+  } else if (k === ']' || k === '[') {
+    if (!S.points.length) return; const i = S.points.findIndex((p) => p.id === S.active);
+    const j = k === ']' ? (i + 1) % S.points.length : (i - 1 + S.points.length) % S.points.length; setActive(S.points[j].id);
+  }
+});
+new ResizeObserver(() => { if ($('ws-measure').classList.contains('on')) { resizeViewer(); drawPlan(); } }).observe($('viewer'));
+if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { drawViewer(); drawPlan(); });
+
+// ------------------------------------------------------------------ start
+const saved = LS.get('swl-project', null);
+if (saved && saved.format === 'mly-scalebar-project/1') loadProjectObj(saved);
+$('buffer').value = S.buffer; $('buffer-v').textContent = `${S.buffer} m`; $('sig').value = S.settings.sigma_click_px;
+initMap();
+if (S.segment && S.segment.end) $('btn-draw').textContent = 'Redraw segment';
+QL = computeQuick(); renderCars(); renderPoints(); renderPairs(); renderQuick(); renderActive();
+if (S.images.length) { buildStrip(); setTab('measure'); showImage(S.cur); }
+window.__swl = { S, V, cams, projWorld, rayOf, triangulate, toENU, i2s, computeQuick, setActive, showImage, loadProjectObj, buildStrip, renderAll, useImages, search, setTab, refreshMap, get map() { return map; } };
+})();
+</script>
+</body>
+</html>
